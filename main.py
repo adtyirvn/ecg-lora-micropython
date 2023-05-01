@@ -7,7 +7,9 @@ from wifi import WiFiConnection
 ssid = config.wifi["SSID"]
 password = config.wifi["PASSWORD"]
 
-wife = WiFiConnection(ssid,password)
+pin = 2
+
+wife = WiFiConnection(ssid,password, pin)
 wife.connect()
 wife.disconnect()
 
