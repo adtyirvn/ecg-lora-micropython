@@ -9,7 +9,7 @@ password = config.wifi["PASSWORD"]
 
 pin = 2
 
-wife = WiFiConnection(ssid,password, pin)
+wife = WiFiConnection(ssid,password,pin)
 wife.connect()
 wife.disconnect()
 
