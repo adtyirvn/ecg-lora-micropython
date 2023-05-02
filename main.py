@@ -29,9 +29,7 @@ def main():
         elapsed_time = current_time - previous_time
         if elapsed_time >= 2000:
             current_datetime = rtc.get_datetime()
-            formatted_time = "{:02d}:{:02d}:{:02d}".format(
-                current_datetime[4], current_datetime[5], current_datetime[6]
-            )
+            formatted_time = rtc.get_formatted_datetime()
             temp, humi = dht.read()
             print("Temp: {} Humi: {}".format(temp, humi))
             print("Current time:", formatted_time)
