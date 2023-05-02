@@ -12,7 +12,7 @@ class WiFiConnection:
     def connect(self):
         self.wlan.active(True)
         if not self.wlan.isconnected():
-            print("Connecting to Wi-Fi...")
+            print("{} {}".format("Connecting to Wi-Fi", self.ssid))
             self.wlan.connect(self.ssid, self.password)
             while not self.wlan.isconnected():
                 self.led.on()
@@ -25,7 +25,7 @@ class WiFiConnection:
             
     def disconnect(self):
         if self.wlan.isconnected():
-            print("Disconnecting from Wi-Fi...")
+            print("{} {}".format("Disconnecting from Wi-Fi", self.ssid))
             self.wlan.disconnect()
         self.wlan.active(False)
         print("Wi-Fi turned off.")
