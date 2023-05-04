@@ -19,7 +19,6 @@ class WiFiConnection:
                 time.sleep(0.2)
                 self.led.off()
                 time.sleep(0.2)
-       
         print("Wi-Fi connected.")
         print("IP address:", self.wlan.ifconfig()[0])
             

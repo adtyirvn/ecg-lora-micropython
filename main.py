@@ -1,42 +1,73 @@
-import uasyncio as asyncio
 import config
-import uos
 import utime
+import ujson as json
 
-uos.chdir('src')
-
-from wifi_controller import WiFiConnection
-from rtc_controller import RTCController
-from dht11_controller import DHT11Sensor
-
-ssid = config.WIFI["SSID"]
-password = config.WIFI["PASSWORD"]
-
-led_pin = 2
-dht_pin = 5
-
-wifi = WiFiConnection(ssid,password,led_pin)
-rtc = RTCController()
-dht = DHT11Sensor(dht_pin)
+# IMPORT PACKAGE
+from src import wifi_controller
+from src import rtc_controller
+from src import dht11_controller
+from src import sx127x
+from src import config_lora
+from src import LoRaSender
 
 def main():
-    wifi.connect()
-    rtc.set_from_internet()
-    wifi.disconnect()
-    previous_time = utime.ticks_ms()
-    while True:
-        current_time = utime.ticks_ms()
-        elapsed_time = current_time - previous_time
-        if elapsed_time >= 2000:
-            current_datetime = rtc.get_datetime()
-            formatted_time = rtc.get_formatted_datetime()
-            temp, humi = dht.read()
-            print("Temp: {} Humi: {}".format(temp, humi))
-            print("Current time:", formatted_time)
-            previous_time = current_time
-    
-main()
-# loop = asyncio.get_event_loop()
-# loop.create_task(main())
-# loop.run_forever()
+    # CONFIG
+    ssid = config.WIFI_SSID
+    password = config.WIFI_PASSWORD
+    led_pin = config.LED_PIN
+    dht_pin = config.DHT_PIN
 
+    delay_ms = 2000
+
+    # LoRa
+    controller = config_lora.Controller()
+    lora = controller.add_transceiver(sx127x.SX127x(name = 'LoRa'),
+                                      pin_id_ss = config_lora.Controller.PIN_ID_FOR_LORA_SS,
+                                      pin_id_RxDone = config_lora.Controller.PIN_ID_FOR_LORA_DIO0)
+    
+    node_name = config_lora.NODE_NAME
+
+    # WiFi
+    wifi = wifi_controller.WiFiConnection(ssid, password, led_pin)
+
+    # RTC
+    rtc = rtc_controller.RTCController()
+
+    # SENSOR
+    dht = dht11_controller.DHT11Sensor(dht_pin)
+
+    # SETUP
+    try:
+        print(node_name)
+        wifi.connect()
+        rtc.set_from_internet()
+        rtc.get_formatted_datetime()
+        wifi.disconnect()
+        previous_time = utime.ticks_ms()
+        while True:
+            current_time = utime.ticks_ms()
+            elapsed_time = current_time - previous_time
+            if elapsed_time >= delay_ms:
+                send_callback(lora, rtc, dht, node_name)
+                previous_time = current_time
+    except Exception as e:
+        print(e)
+
+def get_json_data(dht_service, rtc_service, id):
+    current_datetime = rtc_service.get_datetime()
+    temperature, humidity = dht_service.read()
+    data = {
+            "id": id,
+            "temperature": temperature,
+            "humidity": humidity,
+            "timestamp": current_datetime
+        }
+    json_data = json.dumps(data)
+    return json_data
+
+def send_callback(lora, rtc_service, dht_service, name):
+    payload = get_json_data(dht_service, rtc_service, name)
+    print("Sending packet: {}".format(payload))
+    lora.println(payload.encode('utf-8'))
+        
+main()

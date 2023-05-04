@@ -8,11 +8,14 @@ class DHT11Sensor:
         self.led = Pin(2, Pin.OUT)
     
     def read(self):
-        self.sensor.measure()
-        temperature = self.sensor.temperature()
-        humidity = self.sensor.humidity()
-        self.blink_led()
-        return temperature, humidity
+        try:
+            self.sensor.measure()
+            temperature = self.sensor.temperature()
+            humidity = self.sensor.humidity()
+            self.blink_led()
+            return temperature, humidity
+        except Exception as e:
+            raise Exception("Error reading sensor: {}".format(e))
     
     def blink_led(self):
         self.led.on()
