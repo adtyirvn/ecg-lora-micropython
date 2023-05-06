@@ -34,7 +34,7 @@ def main():
     rtc = rtc_controller.RTCController()
 
     # SENSOR
-    dht = dht11_controller.DHT11Sensor(dht_pin)
+    dht = dht11_controller.DHT11Sensor(dht_pin, led_pin)
 
     # SETUP
     try:

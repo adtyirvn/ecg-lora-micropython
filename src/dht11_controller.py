@@ -3,9 +3,9 @@ from machine import Pin
 from time import sleep
 
 class DHT11Sensor:
-    def __init__(self, pin):
+    def __init__(self, pin, led_pin):
         self.sensor = dht.DHT11(Pin(pin))
-        self.led = Pin(2, Pin.OUT)
+        self.led = Pin(led_pin, Pin.OUT)
     
     def read(self):
         try:
