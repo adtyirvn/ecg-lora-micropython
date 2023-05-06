@@ -69,5 +69,3 @@ def send_callback(lora, rtc_service, dht_service, name):
     payload = get_json_data(dht_service, rtc_service, name)
     print("Sending packet: {}".format(payload))
     lora.println(payload.encode('utf-8'))
-        
-main()
