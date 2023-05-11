@@ -2,6 +2,8 @@ import dht
 from machine import Pin
 from time import sleep
 
+class SensorError(BaseException):
+    pass
 class DHT11Sensor:
     def __init__(self, pin, led_pin):
         self.sensor = dht.DHT11(Pin(pin))
@@ -14,7 +16,7 @@ class DHT11Sensor:
             humidity = self.sensor.humidity()
             self.blink_led()
             return temperature, humidity
-        except Exception as e:
+        except SensorError as e:
             raise Exception("Error reading sensor: {}".format(e))
     
     def blink_led(self):
