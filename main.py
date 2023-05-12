@@ -11,6 +11,7 @@ from src import config_lora
 from src import display_ssd1306_i2c
 from src import ascon
 import binascii
+from time import sleep
 from machine import Pin, SoftI2C
 # from src import LoRaSender
 
@@ -20,6 +21,8 @@ def main():
     password = config.WIFI_PASSWORD
     led_pin = config.LED_PIN
     dht_pin = config.DHT_PIN
+    key = config.ENCRYPT_KEY
+    nonce_g = config.ENCRYPT_NONCE
 
     delay_ms = 2000
 
@@ -59,22 +62,28 @@ def main():
                     current_time = utime.ticks_ms()
                     elapsed_time = current_time - previous_time
                     if elapsed_time >= delay_ms:
-                        send_callback(lora, rtc, dht, node_name, oled, asc)
+                        send_callback(lora, rtc, dht, node_name, oled, asc, key, nonce_g)
                         previous_time = current_time
                 except Exception as e:
                     print(e)
+                    oled.fill(0)
+                    oled.text('error occured', 0, 0)
+                    oled.show()
+                    sleep(1)
                 except KeyboardInterrupt:
                     oled.clear()
                     print("Exit")
                     break
 
-def encryption(ascon, message):
-     key   = ascon.get_random_bytes(16) 
-     nonce = ascon.get_random_bytes(16) 
+def encryption(ascon, message, key, nonce):
+    #  key   = ascon.get_random_bytes(16) 
+    #  nonce = ascon.get_random_bytes(16) 
      ciphertext        = ascon.ascon_encrypt(key, nonce, associateddata='', plaintext=message,  variant="Ascon-128")
+     global nonce_g
+     nonce_g = ciphertext[:-16]
      return ciphertext
 
-def get_json_data(dht_service, rtc_service, id, enc):
+def get_json_data(dht_service, rtc_service, id, enc, key, nonce):
     current_datetime = rtc_service.get_datetime()
     temperature, humidity = dht_service.read()
     data = {
@@ -84,12 +93,12 @@ def get_json_data(dht_service, rtc_service, id, enc):
             "timestamp": current_datetime
         }
     json_data = json.dumps(data)
-    ciphertext = encryption(enc, json_data.encode('utf-8'))
+    ciphertext = encryption(enc, json_data.encode('utf-8'), key, nonce)
     cipher_hex = binascii.hexlify(ciphertext)
     return json_data, cipher_hex
 
-def send_callback(lora, rtc_service, dht_service, name, oled, enc):
-    payload, cipher_hex = get_json_data(dht_service, rtc_service, name, enc)
+def send_callback(lora, rtc_service, dht_service, name, oled, enc, key, nonce):
+    payload, cipher_hex = get_json_data(dht_service, rtc_service, name, enc, key, nonce)
     print("***Sending packet***\n{}\n".format(cipher_hex))
     lora.println(cipher_hex)
     message = json.loads(payload)

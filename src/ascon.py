@@ -304,25 +304,25 @@ class Ascon:
         print("\n".join(["  x{i}={s:016x}".format(**locals()) for i, s in enumerate(S)]))
 
     # === some demo if called directly ===
-def demo_print(data):
+def demo_print(data, asc):
             maxlen = max([len(text) for (text, val) in data])
             for text, val in data:
-                print("{text}:{align} 0x{val} ({length} bytes)".format(text=text, align=((maxlen - len(text)) * " "), val=ascon.bytes_to_hex(val), length=len(val)))
+                print("{text}:{align} 0x{val} ({length} bytes)".format(text=text, align=((maxlen - len(text)) * " "), val=asc.bytes_to_hex(val), length=len(val)))
 
-def demo_aead(variant):
+def demo_aead(variant, asc):
             assert variant in ["Ascon-128", "Ascon-128a", "Ascon-80pq"]
             keysize = 20 if variant == "Ascon-80pq" else 16
             print("=== demo encryption using {variant} ===".format(variant=variant))
 
             # choose a cryptographically strong random key and a nonce that never repeats for the same key:
-            key   = ascon.get_random_bytes(keysize) # zero_bytes(keysize)
-            nonce = ascon.get_random_bytes(16)      # zero_bytes(16)
+            key   = asc.get_random_bytes(keysize) # zero_bytes(keysize)
+            nonce = asc.get_random_bytes(16)      # zero_bytes(16)
             
             associateddata = b"ASCON"
             plaintext      = b"ascon"
 
-            ciphertext        = ascon.ascon_encrypt(key, nonce, associateddata, plaintext,  variant)
-            receivedplaintext = ascon.ascon_decrypt(key, nonce, associateddata, ciphertext, variant)
+            ciphertext        = asc.ascon_encrypt(key, nonce, associateddata, plaintext,  variant)
+            receivedplaintext = asc.ascon_decrypt(key, nonce, associateddata, ciphertext, variant)
 
             if receivedplaintext == None: print("verification failed!")
                 
@@ -333,5 +333,5 @@ def demo_aead(variant):
                         ("ciphertext", ciphertext[:-16]), 
                         ("tag", ciphertext[-16:]), 
                         ("received", receivedplaintext), 
-                    ])
+                    ], asc)
 # demo_aead("Ascon-128")
