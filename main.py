@@ -15,47 +15,49 @@ from time import sleep
 from machine import Pin, SoftI2C
 # from src import LoRaSender
 
-def main():
-    # CONFIG
-    ssid = config.WIFI_SSID
-    password = config.WIFI_PASSWORD
-    led_pin = config.LED_PIN
-    dht_pin = config.DHT_PIN
-    key = config.ENCRYPT_KEY
-    nonce_g = config.ENCRYPT_NONCE
+# CONFIG
+ssid = config.WIFI_SSID
+password = config.WIFI_PASSWORD
+led_pin = config.LED_PIN
+dht_pin = config.DHT_PIN
+key = config.ENCRYPT_KEY
+nonce_g = config.ENCRYPT_NONCE
 
-    delay_ms = 2000
+delay_ms = 2000
 
     # LoRa
-    controller = config_lora.Controller()
-    lora = controller.add_transceiver(sx127x.SX127x(name = 'LoRa'),
+controller = config_lora.Controller()
+lora = controller.add_transceiver(sx127x.SX127x(name = 'LoRa'),
                                       pin_id_ss = config_lora.Controller.PIN_ID_FOR_LORA_SS,
                                       pin_id_RxDone = config_lora.Controller.PIN_ID_FOR_LORA_DIO0)
     
-    node_name = config_lora.NODE_NAME
+node_name = config_lora.NODE_NAME
 
     # WiFi
-    wifi = wifi_controller.WiFiConnection(ssid, password, led_pin)
+wifi = wifi_controller.WiFiConnection(ssid, password, led_pin)
 
     # RTC
-    rtc = rtc_controller.RTCController()
+rtc = rtc_controller.RTCController()
 
     # SENSOR
-    dht = dht11_controller.DHT11Sensor(dht_pin, led_pin)
-    i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
-    oled = display_ssd1306_i2c.Display(i2c)
+dht = dht11_controller.DHT11Sensor(dht_pin, led_pin)
+i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
+oled = display_ssd1306_i2c.Display(i2c)
 
     # ENKRIPSI
-    asc = ascon.Ascon()
+asc = ascon.Ascon()
     # SETUP
-    print(node_name)
-    oled.fill(0)
-    oled.show_text('starting...', 0, 0)
-    oled.show()
-    wifi.connect()
-    rtc.set_from_internet()
-    rtc.get_formatted_datetime()
-    wifi.disconnect()
+print(node_name)
+oled.fill(0)
+oled.show_text('starting...', 0, 0)
+oled.show()
+wifi.connect()
+rtc.set_from_internet()
+rtc.get_formatted_datetime()
+wifi.disconnect()
+
+def main():
+    # print(nonce_g)
     previous_time = utime.ticks_ms()
     while True:
                 try:
@@ -75,13 +77,14 @@ def main():
                     print("Exit")
                     break
 
-def encryption(ascon, message, key, nonce):
+def encryption(ascon, message, key, nonce, mode="ECB"):
     #  key   = ascon.get_random_bytes(16) 
     #  nonce = ascon.get_random_bytes(16) 
-     ciphertext        = ascon.ascon_encrypt(key, nonce, associateddata='', plaintext=message,  variant="Ascon-128")
-     global nonce_g
-     nonce_g = ciphertext[:-16]
-     return ciphertext
+    ciphertext        = ascon.ascon_encrypt(key, nonce,associateddata='', plaintext=message,  variant="Ascon-128") 
+    if mode == "CBC":
+        global nonce_g
+        nonce_g = ciphertext[:16]
+    return ciphertext  
 
 def get_json_data(dht_service, rtc_service, id, enc, key, nonce):
     current_datetime = rtc_service.get_datetime()
@@ -93,7 +96,7 @@ def get_json_data(dht_service, rtc_service, id, enc, key, nonce):
             "timestamp": current_datetime
         }
     json_data = json.dumps(data)
-    ciphertext = encryption(enc, json_data.encode('utf-8'), key, nonce)
+    ciphertext = encryption(enc, json_data.encode('utf-8'), key, nonce, "CBC")
     cipher_hex = binascii.hexlify(ciphertext)
     return json_data, cipher_hex
 
