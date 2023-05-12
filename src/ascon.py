@@ -304,7 +304,6 @@ class Ascon:
         print("\n".join(["  x{i}={s:016x}".format(**locals()) for i, s in enumerate(S)]))
 
     # === some demo if called directly ===
-ascon = Ascon()
 def demo_print(data):
             maxlen = max([len(text) for (text, val) in data])
             for text, val in data:
@@ -335,4 +334,4 @@ def demo_aead(variant):
                         ("tag", ciphertext[-16:]), 
                         ("received", receivedplaintext), 
                     ])
-demo_aead("Ascon-128")
+# demo_aead("Ascon-128")

@@ -9,6 +9,8 @@ from src import dht11_controller
 from src import sx127x
 from src import config_lora
 from src import display_ssd1306_i2c
+from src import ascon
+import binascii
 from machine import Pin, SoftI2C
 # from src import LoRaSender
 
@@ -39,6 +41,9 @@ def main():
     dht = dht11_controller.DHT11Sensor(dht_pin, led_pin)
     i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
     oled = display_ssd1306_i2c.Display(i2c)
+
+    # ENKRIPSI
+    asc = ascon.Ascon()
     # SETUP
     print(node_name)
     oled.fill(0)
@@ -54,9 +59,8 @@ def main():
                     current_time = utime.ticks_ms()
                     elapsed_time = current_time - previous_time
                     if elapsed_time >= delay_ms:
-                        send_callback(lora, rtc, dht, node_name, oled)
+                        send_callback(lora, rtc, dht, node_name, oled, asc)
                         previous_time = current_time
-                
                 except Exception as e:
                     print(e)
                 except KeyboardInterrupt:
@@ -64,7 +68,13 @@ def main():
                     print("Exit")
                     break
 
-def get_json_data(dht_service, rtc_service, id):
+def encryption(ascon, message):
+     key   = ascon.get_random_bytes(16) 
+     nonce = ascon.get_random_bytes(16) 
+     ciphertext        = ascon.ascon_encrypt(key, nonce, associateddata='', plaintext=message,  variant="Ascon-128")
+     return ciphertext
+
+def get_json_data(dht_service, rtc_service, id, enc):
     current_datetime = rtc_service.get_datetime()
     temperature, humidity = dht_service.read()
     data = {
@@ -74,12 +84,14 @@ def get_json_data(dht_service, rtc_service, id):
             "timestamp": current_datetime
         }
     json_data = json.dumps(data)
-    return json_data
+    ciphertext = encryption(enc, json_data.encode('utf-8'))
+    cipher_hex = binascii.hexlify(ciphertext)
+    return json_data, cipher_hex
 
-def send_callback(lora, rtc_service, dht_service, name, oled):
-    payload = get_json_data(dht_service, rtc_service, name)
-    print("Sending packet: {}".format(payload))
-    lora.println(payload.encode('utf-8'))
+def send_callback(lora, rtc_service, dht_service, name, oled, enc):
+    payload, cipher_hex = get_json_data(dht_service, rtc_service, name, enc)
+    print("***Sending packet***\n{}\n".format(cipher_hex))
+    lora.println(cipher_hex)
     message = json.loads(payload)
     date = f"{get_formatted_date(message['timestamp'])}"
     time = f"{get_formatted_time(message['timestamp'])}"
@@ -101,6 +113,7 @@ def get_formatted_date(d):
     formatted_date = "{:04d}-{:02d}-{:02d}".format(
         date_tuple[0], date_tuple[1], date_tuple[2])
     return formatted_date
+
 def get_formatted_time(t):
     time_tuple = t
     formatted_time = "{:02d}:{:02d}:{:02d}".format(
