@@ -67,7 +67,7 @@ def main():
                         send_callback(lora, rtc, dht, node_name, oled, asc, key, nonce_g)
                         previous_time = current_time
                 except Exception as e:
-                    print(e)
+                    print(f"Error message: {e}")
                     oled.fill(0)
                     oled.text('error occured', 0, 0)
                     oled.show()
@@ -78,56 +78,53 @@ def main():
                     break
 
 def encryption(ascon, message, key, nonce, mode="ECB"):
-    #  key   = ascon.get_random_bytes(16) 
-    #  nonce = ascon.get_random_bytes(16) 
-    ciphertext        = ascon.ascon_encrypt(key, nonce,associateddata='', plaintext=message,  variant="Ascon-128") 
+    print(f"key: {binascii.hexlify(key)} len: {len(key)}")
+    print(f"nonce: {binascii.hexlify(nonce)} len: {len(key)}")
+    ciphertext = ascon.ascon_encrypt(key, nonce,associateddata="", plaintext=message,  variant="Ascon-128") 
     if mode == "CBC":
         global nonce_g
         nonce_g = ciphertext[:16]
     return ciphertext  
 
-def get_json_data(dht_service, rtc_service, id, enc, key, nonce):
+def get_json_data(dht_service, rtc_service, id):
     current_datetime = rtc_service.get_datetime()
     temperature, humidity = dht_service.read()
     data = {
             "id": id,
-            "temperature": temperature,
-            "humidity": humidity,
-            "timestamp": current_datetime
+            "t": temperature,
+            "h": humidity,
+            "tsp": current_datetime
         }
     json_data = json.dumps(data)
-    ciphertext = encryption(enc, json_data.encode('utf-8'), key, nonce, "CBC")
-    cipher_hex = binascii.hexlify(ciphertext)
-    return json_data, cipher_hex
+    return json_data
 
 def send_callback(lora, rtc_service, dht_service, name, oled, enc, key, nonce):
-    payload, cipher_hex = get_json_data(dht_service, rtc_service, name, enc, key, nonce)
-    print("***Sending packet***\n{}\n".format(cipher_hex))
+    payload = get_json_data(dht_service, rtc_service, name)
+    ciphertext = encryption(enc, payload.encode('utf-8'), key, nonce, "CBC")
+    cipher_hex = binascii.hexlify(ciphertext)
+    print(f"***Sending packet***\n{cipher_hex}\nlen: {len(cipher_hex)}")
     lora.println(cipher_hex)
     message = json.loads(payload)
-    date = f"{get_formatted_date(message['timestamp'])}"
-    time = f"{get_formatted_time(message['timestamp'])}"
-    t = f"T: {message['temperature']}C"
-    h = f"H: {message['humidity']}%"
-    oled.fill(0)
+    show_info(oled, message)
+
+def show_info(oled, message):
+    date = f"{get_formatted_date(message['tsp'])}"
+    time = f"{get_formatted_time(message['tsp'])}"
+    t = f"T: {message['t']}C"
+    h = f"H: {message['h']}%"
     # oled.show_text(text = date, clear_first = False)
     # oled.show_text(text = time, clear_first = False, x=0, y=10)  
     # oled.show_text(text = t, clear_first = False, x=0, y=20)  
     # oled.show_text(text = h, clear_first = False, x=0, y=30)
+    oled.fill(0)
     oled.text(date, 0, 0) 
     oled.text(time, 0, 10) 
     oled.text(t, 0, 20) 
     oled.text(h, 0, 30) 
     oled.show()
+     
+def get_formatted_date(date_tuple):
+    return f"{date_tuple[0]:04d}-{date_tuple[1]:02d}-{date_tuple[2]:02d}"
 
-def get_formatted_date(d):
-    date_tuple = d
-    formatted_date = "{:04d}-{:02d}-{:02d}".format(
-        date_tuple[0], date_tuple[1], date_tuple[2])
-    return formatted_date
-
-def get_formatted_time(t):
-    time_tuple = t
-    formatted_time = "{:02d}:{:02d}:{:02d}".format(
-        time_tuple[4], time_tuple[5], time_tuple[6])
-    return formatted_time
+def get_formatted_time(time_tuple):
+    return f"{time_tuple[4]:02d}:{time_tuple[5]:02d}:{time_tuple[6]:02d}"
