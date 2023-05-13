@@ -19,12 +19,17 @@ class WiFiConnection:
                 time.sleep(0.2)
                 self.led.off()
                 time.sleep(0.2)
-        print("Wi-Fi connected.")
-        print("IP address:", self.wlan.ifconfig()[0])
+        status = "Wi-Fi connected."
+        print(status)
+        ip = f"{self.wlan.ifconfig()[0]}"
+        print(ip)
+        return status, ip
             
     def disconnect(self):
         if self.wlan.isconnected():
             print("{} {}".format("Disconnecting from Wi-Fi", self.ssid))
             self.wlan.disconnect()
         self.wlan.active(False)
-        print("Wi-Fi turned off.")
+        status = f"Wi-Fi turned off."
+        print(status)
+        return status

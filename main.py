@@ -25,7 +25,7 @@ nonce_g = config.ENCRYPT_NONCE
 
 delay_ms = 2000
 
-    # LoRa
+# LoRa
 controller = config_lora.Controller()
 lora = controller.add_transceiver(sx127x.SX127x(name = 'LoRa'),
                                       pin_id_ss = config_lora.Controller.PIN_ID_FOR_LORA_SS,
@@ -33,28 +33,41 @@ lora = controller.add_transceiver(sx127x.SX127x(name = 'LoRa'),
     
 node_name = config_lora.NODE_NAME
 
-    # WiFi
+# WiFi
 wifi = wifi_controller.WiFiConnection(ssid, password, led_pin)
 
-    # RTC
+# RTC
 rtc = rtc_controller.RTCController()
 
-    # SENSOR
+# SENSOR
 dht = dht11_controller.DHT11Sensor(dht_pin, led_pin)
 i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
 oled = display_ssd1306_i2c.Display(i2c)
 
-    # ENKRIPSI
+# ENKRIPSI
 asc = ascon.Ascon()
-    # SETUP
-print(node_name)
+# SETUP
 oled.fill(0)
-oled.show_text('starting...', 0, 0)
+oled.text('starting...', 0, 0)
 oled.show()
-wifi.connect()
+status, ip = wifi.connect()
+oled.fill(0)
+oled.text(status, 0, 0)
+oled.text(ip, 0, 10)
+oled.show()
+sleep(1)
 rtc.set_from_internet()
-rtc.get_formatted_datetime()
-wifi.disconnect()
+date, time = rtc.get_formatted_datetime()
+oled.fill(0)
+oled.text(date, 0, 0)
+oled.text(time, 0, 10)
+oled.show()
+sleep(1)
+status = wifi.disconnect()
+oled.fill(0)
+oled.text(status, 0, 0)
+oled.show()
+sleep(1)
 
 def main():
     # print(nonce_g)
@@ -66,6 +79,7 @@ def main():
                     if elapsed_time >= delay_ms:
                         send_callback(lora, rtc, dht, node_name, oled, asc, key, nonce_g)
                         previous_time = current_time
+                         
                 except Exception as e:
                     print(f"Error message: {e}")
                     oled.fill(0)
