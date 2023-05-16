@@ -82,8 +82,7 @@ def main():
                 show_on_oled(["Error:", "Sensor error..."])
     except KeyboardInterrupt:
         oled.clear()
-        show_on_oled(["Goodbye..."])
-        sleep(5)
+        show_on_oled(["Goodbye..."], 3)
         oled.clear()
 
 
