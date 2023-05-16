@@ -22,6 +22,8 @@ password = config.WIFI_PASSWORD
 led_pin = config.LED_PIN
 dht_pin = config.DHT_PIN
 
+led = Pin(led_pin, Pin.OUT)
+
 delay_ms = 2000
 
 # LoRa
@@ -54,35 +56,38 @@ node_name = config_lora.NODE_NAME
 
 def main():
     try:
-        show_on_oled(oled, ["starting..."])
+        show_on_oled(["Starting..."])
+        blink_led(3, 0.5, 0.5)
 
+        show_on_oled(["Connecting to", f"{ssid} wifi..."])
         status, ip = wifi.connect()
-        show_on_oled(oled, [status, ip], delay=1)
+        show_on_oled([status, ip], delay=1)
 
         rtc.set_from_internet()
         date = rtc.get_formatted_date()
         time = rtc.get_formatted_time()
-        show_on_oled(oled, [date, time], delay=1)
+        show_on_oled([date, time], delay=1)
 
         status = wifi.disconnect()
-        show_on_oled(oled, [status], delay=1)
+        show_on_oled([status], delay=1)
 
-        show_on_oled(oled, ["Ready..."], delay=1)
+        show_on_oled(["Ready..."], delay=1)
         print("Ready...")
 
         while True:
             try:
-                on_receive(lora, rtc, dht, node_name, oled, asc, key, nonce_g)
+                on_receive(lora, rtc, dht, asc, key, nonce_g)
             except Exception as e:
-                print(e)
+                print(f"Error: {e}")
+                show_on_oled(["Error:", "Sensor error..."])
     except KeyboardInterrupt:
         oled.clear()
-        show_on_oled(oled, ["goodbye..."])
+        show_on_oled(["Goodbye..."])
         sleep(5)
         oled.clear()
 
 
-def show_on_oled(oled, items, delay=0):
+def show_on_oled(items, delay=0):
     oled.fill(0)
     for i, text in enumerate(items):
         oled.text(text, 0, 10 * i)
@@ -90,7 +95,15 @@ def show_on_oled(oled, items, delay=0):
     sleep(delay)
 
 
-def on_receive(lora, rtc_service, dht_service, name, oled, enc, key, nonce):
+def blink_led(times=1, on_seconds=0.1, off_seconds=0.1):
+    for i in range(times):
+        led.on()
+        sleep(on_seconds)
+        led.off()
+        sleep(off_seconds)
+
+
+def on_receive(lora, rtc_service, dht_service, enc, key, nonce):
     if lora.receivedPacket():
         global nonce_g
         payload = lora.read_payload()
@@ -105,13 +118,13 @@ def on_receive(lora, rtc_service, dht_service, name, oled, enc, key, nonce):
         if recipient != node_one and recipient != master_node:
             return
         if sender == master_node:
-            nonce_gg = send_callback(lora, rtc_service, dht_service, name,
-                                     oled, enc, key, config.ENCRYPT_NONCE if bool(rst) else nonce)
+            nonce_gg = send_callback(lora, rtc_service, dht_service,
+                                     enc, key, config.ENCRYPT_NONCE if bool(rst) else nonce)
             nonce_g = nonce_gg
 
 
-def send_callback(lora, rtc_service, dht_service, name, oled, enc, key, nonce):
-    payload = get_json_data(dht_service, rtc_service, name)
+def send_callback(lora, rtc_service, dht_service, enc, key, nonce):
+    payload = get_json_data(dht_service, rtc_service)
     ciphertext, new_nonce = encryption(
         enc, payload.encode("utf-8"), key, nonce, "CBC")
     print(
@@ -119,14 +132,13 @@ def send_callback(lora, rtc_service, dht_service, name, oled, enc, key, nonce):
     lora.println(ciphertext)
     message = json.loads(payload)
     print(message)
-    show_info(oled, message)
+    show_info(message)
     return new_nonce
 
 
 def encryption(ascon, message, key, nonce, mode="ECB"):
     print(f"key: {key} len: {len(key)}")
     print(f"nonce: {nonce} len: {len(nonce)}")
-
     ciphertext = ascon.ascon_encrypt(
         key, nonce, associateddata=b"", plaintext=message,  variant="Ascon-128")
     if mode == "CBC":
@@ -135,7 +147,7 @@ def encryption(ascon, message, key, nonce, mode="ECB"):
     return ciphertext, new_nonce
 
 
-def get_json_data(dht_service, rtc_service, id):
+def get_json_data(dht_service, rtc_service):
     dt = rtc_service.get_datetime()
     # iso_time = "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}".format(dt[0], dt[1], dt[2], dt[4], dt[5], dt[6])
     temperature, humidity = dht_service.read()
@@ -150,12 +162,12 @@ def get_json_data(dht_service, rtc_service, id):
     return json_data
 
 
-def show_info(oled, message):
+def show_info(message):
     date = f"{get_formatted_date(message['tsp'])}"
     time = f"{get_formatted_time(message['tsp'])}"
     t = f"T: {message['t']}C"
     h = f"H: {message['h']}%"
-    show_on_oled(oled, [date, time, t, h])
+    show_on_oled([date, time, t, h])
 
 
 def get_formatted_date(date_tuple):
