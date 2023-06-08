@@ -1,9 +1,10 @@
 import config
-import utime
+# import utime
 import ujson as json
-import struct
+# import struct
 
 # IMPORT PACKAGE
+from src import ads1x15
 from src import wifi_controller
 from src import rtc_controller
 from src import dht11_controller
@@ -11,7 +12,7 @@ from src import sx127x
 from src import config_lora
 from src import display_ssd1306_i2c
 from src import ascon
-import binascii
+# import binascii
 from time import sleep
 from machine import Pin, SoftI2C
 # from src import LoRaSender
@@ -41,6 +42,7 @@ rtc = rtc_controller.RTCController()
 # SENSOR
 dht = dht11_controller.DHT11Sensor(dht_pin, led_pin)
 i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
+adc = ads1x15.ADS1115(i2c, 72, 1)
 oled = display_ssd1306_i2c.Display(i2c)
 
 # ENKRIPSI
@@ -76,14 +78,15 @@ def main():
 
         while True:
             try:
-                on_receive(lora, rtc, dht, asc, key, nonce_g)
+                on_receive(lora, asc, key, nonce_g)
             except Exception as e:
                 print(f"Error: {e}")
                 show_on_oled(["Error:", "Sensor error..."])
     except KeyboardInterrupt:
         oled.clear()
-        show_on_oled(["Goodbye..."], 3)
+        show_on_oled(["Goodbye..."], 5)
         oled.clear()
+        led.off()
 
 
 def show_on_oled(items, delay=0):
@@ -102,7 +105,7 @@ def blink_led(times=1, on_seconds=0.1, off_seconds=0.1):
         sleep(off_seconds)
 
 
-def on_receive(lora, rtc_service, dht_service, enc, key, nonce):
+def on_receive(lora, enc, key, nonce):
     if lora.receivedPacket():
         global nonce_g
         payload = lora.read_payload()
@@ -117,13 +120,12 @@ def on_receive(lora, rtc_service, dht_service, enc, key, nonce):
         if recipient != node_one and recipient != master_node:
             return
         if sender == master_node:
-            nonce_gg = send_callback(lora, rtc_service, dht_service,
-                                     enc, key, config.ENCRYPT_NONCE if bool(rst) else nonce)
+            nonce_gg = send_callback(lora, enc, key, config.ENCRYPT_NONCE if bool(rst) else nonce)
             nonce_g = nonce_gg
 
 
-def send_callback(lora, rtc_service, dht_service, enc, key, nonce):
-    payload = get_json_data(dht_service, rtc_service)
+def send_callback(lora, enc, key, nonce):
+    payload = get_json_data()
     ciphertext, new_nonce = encryption(
         enc, payload.encode("utf-8"), key, nonce, "CBC")
     print(
@@ -146,10 +148,11 @@ def encryption(ascon, message, key, nonce, mode="ECB"):
     return ciphertext, new_nonce
 
 
-def get_json_data(dht_service, rtc_service):
-    dt = rtc_service.get_datetime()
-    # iso_time = "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}".format(dt[0], dt[1], dt[2], dt[4], dt[5], dt[6])
-    temperature, humidity = dht_service.read()
+def get_json_data():
+    dt = rtc.get_datetime()
+    # temperature, humidity = dht.read()
+    temperature = adc.read()
+    humidity = adc.raw_to_v(temperature)
     data = {
         "id": node_one,
         "to": master_node,
@@ -160,7 +163,6 @@ def get_json_data(dht_service, rtc_service):
     json_data = json.dumps(data)
     return json_data
 
-
 def show_info(message):
     date = f"{get_formatted_date(message['tsp'])}"
     time = f"{get_formatted_time(message['tsp'])}"
@@ -168,10 +170,8 @@ def show_info(message):
     h = f"H: {message['h']}%"
     show_on_oled([date, time, t, h])
 
-
 def get_formatted_date(date_tuple):
     return f"{date_tuple[0]:04d}-{date_tuple[1]:02d}-{date_tuple[2]:02d}"
-
 
 def get_formatted_time(time_tuple):
     return f"{time_tuple[4]:02d}:{time_tuple[5]:02d}:{time_tuple[6]:02d}"
